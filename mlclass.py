@@ -5,6 +5,7 @@ print(os.listdir("C:/Users/danie/Desktop/practicapython/MultiLC/MAFood121"))
 from tqdm import tqdm, tqdm_notebook
 # -------------------------------------------------------------------------------------------------------------------------------
 
+
 import os
 import sys
 import cv2
