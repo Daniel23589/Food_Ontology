@@ -1,7 +1,7 @@
 import numpy as np # linear algebra
 import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 import os
-print(os.listdir("C:/Users/danie/Desktop/practicapython/MultiLC/MAFood121"))
+print(os.listdir("MAFood121"))
 from tqdm import tqdm, tqdm_notebook
 # -------------------------------------------------------------------------------------------------------------------------------
 
@@ -19,13 +19,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import torchvision.models as models
 
+
 use_cuda = True
 device = torch.device("cuda" if use_cuda else "cpu")
 torch.manual_seed(42) # try and make the results more reproducible
-BASE_PATH = 'C:/Users/danie/Desktop/practicapython/MultiLC/MAFood121/'
+BASE_PATH = 'MAFood121/'
 
 # ------------------------------------------------------------------------------------------------------------------------------
-#print(os.listdir("C:/Users/danie/Desktop/practicapython/MultiLC/MAFood121/images"))
+#print(os.listdir("MAFood121/images"))
 epochs = 35
 batch_size = 64
 MICRO_DATA = True # very small subset (just 3 groups)
@@ -45,7 +46,7 @@ f.close()
 # ------------------------------------------------------------------------------------------------------------------------------
 #Base Ingredients
 f = open(BASE_PATH + '/annotations/baseIngredients.txt', "r") # crear baseingredients para mafood
-base_ing = f.read().split('\n')
+base_ing = f.read().strip().split(', ')
 f.close()
 # ------------------------------------------------------------------------------------------------------------------------------
 print(ingredients)
@@ -54,13 +55,14 @@ print(classes)
 print("#######################################################################################")
 print(base_ing)
 
+'''
 #print(base_ing, ingredients, classes)
 # ------------------------------------------------------------------------------------------------------------------------------
 new_ingredients = []
 for arr in ingredients:
     arr = arr.split(",")
     new_ingredients.append(arr)
-#print(new_ingredients)
+print(new_ingredients)
 # ------------------------------------------------------------------------------------------------------------------------------
 
 from sklearn.preprocessing import MultiLabelBinarizer
@@ -71,6 +73,7 @@ mlb = MultiLabelBinarizer()
 #df["target"] = classes
 #food_dict = df
 # -------------------------------------------------------------------------------------------------------------------------------
+'''
 
 #train
 f = open(BASE_PATH + '/annotations/train.txt', "r")
@@ -99,11 +102,11 @@ f.close()
 #train_images
 len(train_labels)
 
-train_images = ["C:/Users/danie/Desktop/PracticaTorch/multilalbel/MAFood121/images/" + s + ".jpg" for s in train_images]
+train_images = ["MAFood121/images/" + s  for s in train_images]
 all_img_df = pd.DataFrame({'path': train_images, 'class_id': train_labels})
-val_images = ["C:/Users/danie/Desktop/PracticaTorch/multilalbel/MAFood121/images/" + s + ".jpg" for s in val_images]
+val_images = ["MAFood121/images/" + s  for s in val_images]
 val_img_df = pd.DataFrame({'path': val_images, 'class_id': val_labels})
-test_images = ["C:/Users/danie/Desktop/PracticaTorch/multilalbel/MAFood121/images/" + s + ".jpg" for s in test_images]
+test_images = ["MAFood121/images/" + s  for s in test_images]
 test_img_df = pd.DataFrame({'path': test_images, 'class_id': test_labels})
 
 all_img_df = all_img_df[:-1]
@@ -130,6 +133,27 @@ print(test_img_df)
 #print(food_dict)
 
 
+
+from sklearn.preprocessing import MultiLabelBinarizer
+mlb = MultiLabelBinarizer()
+
+train_ingredients = []
+train_classid = []
+with open(BASE_PATH + '/annotations/train_lbls_ff.txt') as f1:
+    for line in f1:
+       idx_ingredients = []
+       classid = int(line)
+       train_classid.append(classid)
+       for ing in ingredients[classid].strip().split(","):
+           idx_ingredients.append(str(base_ing.index(ing)))
+       train_ingredients.append(idx_ingredients)
+df_train = pd.DataFrame(mlb.fit_transform(train_ingredients),columns=mlb.classes_) #binary encode ingredients
+df_train["path"] = all_img_df['path']
+df_train["class_id"] = train_classid 
+food_dict_train = df_train
+print(df_train)
+
+
 #Dataframe for train images
 new_data = []
 for index, row in all_img_df.iterrows():
@@ -137,14 +161,37 @@ for index, row in all_img_df.iterrows():
     food = row["class_name"]
     path = row["path"]
     class_id = row["class_id"]
-    #binary_encod = food_dict.loc[food_dict["target"] == food]
+    
+    binary_encod = food_dict_train.loc[food_dict_train["path"] == path]
     #binary_encod["path"] = path
     #binary_encod["class_id"] = class_id
     #print(binary_encod)
     #print((list(binary_encod.columns.values)))
     #print(len(np.array(binary_encod)[0]))
-    #new_data.append(np.array(binary_encod)[0])
-    
+    print(np.array(binary_encod)[0])
+    new_data.append(np.array(binary_encod)[0])
+
+col_names = list(binary_encod.columns.values)
+train_df = pd.DataFrame(new_data, columns = col_names)
+
+print(train_df)
+
+test_ingredients = []
+test_classid = []
+with open(BASE_PATH + '/annotations/test_lbls_ff.txt') as f1:
+    for line in f1:
+       idx_ingredients = []
+       classid = int(line)
+       test_classid.append(classid)
+       for ing in ingredients[classid].strip().split(","):
+           idx_ingredients.append(str(base_ing.index(ing)))
+       test_ingredients.append(idx_ingredients)
+df_test = pd.DataFrame(mlb.fit_transform(test_ingredients),columns=mlb.classes_) #binary encode ingredients
+df_test["path"] = test_img_df['path']
+df_test["class_id"] = test_classid
+food_dict_test = df_test
+print(df_test)
+
 #Dataframe for test images
 test_data = []
 for index, row in test_img_df.iterrows():
@@ -152,25 +199,43 @@ for index, row in test_img_df.iterrows():
     food = row["class_name"]
     path = row["path"]
     class_id = row["class_id"]
+    binary_encod = food_dict_test.loc[food_dict_test["path"] == path]
     #binary_encod = food_dict.loc[food_dict["target"] == food]
     #binary_encod["path"] = path
     #binary_encod["class_id"] = int(class_id)
-    #test_data.append(np.array(binary_encod)[0])
+    test_data.append(np.array(binary_encod)[0])
 
+col_names = list(binary_encod.columns.values)
 test_df = pd.DataFrame(test_data, columns = col_names)
 
 train_df.to_hdf('train_df.h5','df',mode='w',format='table',data_columns=True)
-val_df.to_hdf('val_df.h5','df',mode='w',format='table',data_columns=True)
+#val_df.to_hdf('val_df.h5','df',mode='w',format='table',data_columns=True)
 test_df.to_hdf('test_df.h5','df',mode='w',format='table',data_columns=True)
 # -------------------------------------------------------------------------------------------------------------------------------
 
-train_df = pd.read_hdf("../input/preloaded/train_df.h5")
-val_df = pd.read_hdf("../input/preloaded/test_df.h5")
-test_df = pd.read_hdf("../input/test-data/test_df.h5")
+#START HERE
+import torchvision.models as models
+from tqdm import tqdm, tqdm_notebook, tnrange
+#use_cuda = False
+#device = torch.device("cuda" if use_cuda else "cpu")
+torch.manual_seed(42) # try and make the results more reproducible
+BASE_PATH = 'MAFood121/'
+
+print(os.listdir("MAFood121/images"))
+epochs = 8
+batch_size = 2
+SMALL_DATA = False
+IMG_SIZE = (384, 384)
+
+
+
+train_df = pd.read_hdf("train_df.h5")
+#val_df = pd.read_hdf("../input/preloaded/test_df.h5")
+test_df = pd.read_hdf("test_df.h5")
 
 if SMALL_DATA:
     train_df = train_df[:128]
-    val_df = test_df[:128]
+    #val_df = test_df[:128]
     test_df = actual_test_df[:128]
 
 col_names = list(train_df.columns.values)
@@ -232,8 +297,8 @@ optimizer = torch.optim.Adam(model.parameters())
 train_dataset = DataWrapper(train_df, True)
 train_loader = torch.utils.data.DataLoader(train_dataset,shuffle=True, batch_size=batch_size, pin_memory=False)
 
-val_dataset = DataWrapper(val_df, True)
-val_loader = torch.utils.data.DataLoader(val_dataset,shuffle=True, batch_size=batch_size, pin_memory=False)
+#val_dataset = DataWrapper(val_df, True)
+#val_loader = torch.utils.data.DataLoader(val_dataset,shuffle=True, batch_size=batch_size, pin_memory=False)
 
 test_dataset = DataWrapper(test_df, True)
 test_loader = torch.utils.data.DataLoader(test_dataset,shuffle=True, batch_size=batch_size, pin_memory=False)
@@ -335,6 +400,7 @@ for i in tnrange(epochs, desc='Epochs'):
     
     all_outputs = []
     all_targets = []
+    '''
     #Running through all mini batches in the dataset
     count, correct, total, lost_val = test_iter, 0, 0, 0
     for img_data, target in tqdm_notebook(val_loader, desc='Testing'):
@@ -359,7 +425,7 @@ for i in tnrange(epochs, desc='Epochs'):
         ax4.plot(count, c_acc/total_batch, 'b.')
         correct += c_acc
         count += 1
-    
+    '''
     #print("Outputs: ", len(all_outputs), " x ", len(all_outputs[0]))
     #print("Targets: ", len(all_targets), " x ", len(all_targets[0]))
     
