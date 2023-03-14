@@ -2,7 +2,7 @@
 Image recognition
 - **mlclass.py:** contains the code
 
-inside the folder is:
+inside the MAFood121 folder is:
 
 image sorter with pytorch
 - **annotations:** contains the annotations of dishes, foodgroups, train, test and val
