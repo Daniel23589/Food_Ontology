@@ -2,7 +2,7 @@ import numpy as np # linear algebra
 import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 import os
 print(os.listdir("MAFood121"))
-from tqdm import tqdm, tqdm_notebook
+#from tqdm import tqdm, tqdm_notebook
 # -------------------------------------------------------------------------------------------------------------------------------
 
 import os
@@ -18,7 +18,7 @@ from glob import glob
 import pandas as pd
 import matplotlib.pyplot as plt
 import torchvision.models as models
-
+from torchvision.models import ResNet50_Weights
 
 use_cuda = True
 device = torch.device("cuda" if use_cuda else "cpu")
@@ -151,7 +151,7 @@ df_train = pd.DataFrame(mlb.fit_transform(train_ingredients),columns=mlb.classes
 df_train["path"] = all_img_df['path']
 df_train["class_id"] = train_classid 
 food_dict_train = df_train
-print(df_train)
+#print(df_train)
 
 
 #Dataframe for train images
@@ -168,13 +168,13 @@ for index, row in all_img_df.iterrows():
     #print(binary_encod)
     #print((list(binary_encod.columns.values)))
     #print(len(np.array(binary_encod)[0]))
-    print(np.array(binary_encod)[0])
+    #print(np.array(binary_encod)[0])
     new_data.append(np.array(binary_encod)[0])
 
 col_names = list(binary_encod.columns.values)
 train_df = pd.DataFrame(new_data, columns = col_names)
 
-print(train_df)
+#print(train_df)
 
 test_ingredients = []
 test_classid = []
@@ -190,7 +190,7 @@ df_test = pd.DataFrame(mlb.fit_transform(test_ingredients),columns=mlb.classes_)
 df_test["path"] = test_img_df['path']
 df_test["class_id"] = test_classid
 food_dict_test = df_test
-print(df_test)
+#print(df_test)
 
 #Dataframe for test images
 test_data = []
@@ -215,7 +215,9 @@ test_df.to_hdf('test_df.h5','df',mode='w',format='table',data_columns=True)
 
 #START HERE
 import torchvision.models as models
-from tqdm import tqdm, tqdm_notebook, tnrange
+#from tqdm.notebook import tqdm #, tqdm_notebook, tnrange
+from tqdm import tqdm
+from tqdm.notebook import tqdm as tqdm_notebook, trange as tnrange
 #use_cuda = False
 #device = torch.device("cuda" if use_cuda else "cpu")
 torch.manual_seed(42) # try and make the results more reproducible
@@ -223,20 +225,20 @@ BASE_PATH = 'MAFood121/'
 
 print(os.listdir("MAFood121/images"))
 epochs = 8
-batch_size = 2
+batch_size = 16
 SMALL_DATA = False
 IMG_SIZE = (384, 384)
 
 
 
 train_df = pd.read_hdf("train_df.h5")
-#val_df = pd.read_hdf("../input/preloaded/test_df.h5")
+val_df = pd.read_hdf("test_df.h5")
 test_df = pd.read_hdf("test_df.h5")
 
 if SMALL_DATA:
     train_df = train_df[:128]
-    #val_df = test_df[:128]
-    test_df = actual_test_df[:128]
+    val_df = test_df[:128]
+    test_df = test_df[:128]
 
 col_names = list(train_df.columns.values)
 
@@ -272,7 +274,7 @@ class DataWrapper(data.Dataset):
     
 # -------------------------------------------------------------------------------------------------------------------------------
 
-model = models.resnet50(pretrained=True)
+model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
 # #freeze layers
 # for param in model.parameters():
 #      param.requires_grad = False
@@ -297,8 +299,8 @@ optimizer = torch.optim.Adam(model.parameters())
 train_dataset = DataWrapper(train_df, True)
 train_loader = torch.utils.data.DataLoader(train_dataset,shuffle=True, batch_size=batch_size, pin_memory=False)
 
-#val_dataset = DataWrapper(val_df, True)
-#val_loader = torch.utils.data.DataLoader(val_dataset,shuffle=True, batch_size=batch_size, pin_memory=False)
+val_dataset = DataWrapper(val_df, True)
+val_loader = torch.utils.data.DataLoader(val_dataset,shuffle=True, batch_size=batch_size, pin_memory=False)
 
 test_dataset = DataWrapper(test_df, True)
 test_loader = torch.utils.data.DataLoader(test_dataset,shuffle=True, batch_size=batch_size, pin_memory=False)
@@ -340,7 +342,7 @@ ax4.set_title('Test Accuracy')
 
 f1_scores = defaultdict(list)
 
-for i in tnrange(epochs, desc='Epochs'):
+for i in tqdm(range(epochs), desc='Epochs'):
     print("Epoch ",i)
     ## Train Phase
     #Model switches to train phase
@@ -350,31 +352,31 @@ for i in tnrange(epochs, desc='Epochs'):
     all_targets = []
     # Running through all mini batches in the dataset
     count, loss_val, correct, total = train_iter, 0, 0, 0
-    for img_data, target in tqdm_notebook(train_loader, desc='Training'):    
-        img_data, target = img_data.to(device), target.to(device)
-        
-        output = model(img_data) #FWD prop
+    with tqdm(train_loader, desc='Training', total=len(train_loader), miniters=1) as pbar:
+        for img_data, target in pbar:
+            img_data, target = img_data.to(device), target.to(device)
+            output = model(img_data) #FWD prop
 
-        loss = criterion(output, target) #Cross entropy loss
-        c_loss = loss.data.item()
-        ax1.plot(count, c_loss, 'r.')
-        loss_val += c_loss
+            loss = criterion(output, target) #Cross entropy loss
+            c_loss = loss.data.item()
+            ax1.plot(count, c_loss, 'r.')
+            loss_val += c_loss
 
-        optimizer.zero_grad() #Zero out any cached gradients
-        loss.backward() #Backward pass
-        optimizer.step() #Update the weights
+            optimizer.zero_grad() #Zero out any cached gradients
+            loss.backward() #Backward pass
+            optimizer.step() #Update the weights
 
-        total_batch = (target.size(0) * target.size(1))
-        total += total_batch
-        output_data = torch.sigmoid(output)>=0.5
-        target_data = (target==1.0)
-        for arr1,arr2 in zip(output_data, target_data):
-            all_outputs.append(list(arr1.cpu().numpy()))
-            all_targets.append(list(arr2.cpu().numpy()))
-        c_acc = torch.sum((output_data == target_data.to(device)).to(torch.float)).item()
-        ax2.plot(count, c_acc/total_batch, 'r.')
-        correct += c_acc
-        count +=1
+            total_batch = (target.size(0) * target.size(1))
+            total += total_batch
+            output_data = torch.sigmoid(output)>=0.5
+            target_data = (target==1.0)
+            for arr1,arr2 in zip(output_data, target_data):
+                all_outputs.append(list(arr1.cpu().numpy()))
+                all_targets.append(list(arr2.cpu().numpy()))
+            c_acc = torch.sum((output_data == target_data.to(device)).to(torch.float)).item()
+            ax2.plot(count, c_acc/total_batch, 'r.')
+            correct += c_acc
+            count +=1
         
     all_outputs = np.array(all_outputs)
     all_targets = np.array(all_targets)
@@ -400,10 +402,10 @@ for i in tnrange(epochs, desc='Epochs'):
     
     all_outputs = []
     all_targets = []
-    '''
+    
     #Running through all mini batches in the dataset
     count, correct, total, lost_val = test_iter, 0, 0, 0
-    for img_data, target in tqdm_notebook(val_loader, desc='Testing'):
+    for img_data, target in tqdm(val_loader, desc='Testing', total=len(val_loader)):
         img_data, target = img_data.to(device), target.to(device)
         output = model(img_data)
         loss = criterion(output, target) #Cross entropy loss
@@ -425,13 +427,15 @@ for i in tnrange(epochs, desc='Epochs'):
         ax4.plot(count, c_acc/total_batch, 'b.')
         correct += c_acc
         count += 1
-    '''
+    
     #print("Outputs: ", len(all_outputs), " x ", len(all_outputs[0]))
     #print("Targets: ", len(all_targets), " x ", len(all_targets[0]))
     
     #F1 Score
     all_outputs = np.array(all_outputs)
     all_targets = np.array(all_targets)
+    print(all_outputs)
+    print(all_targets)
     f1score_samples = f1_score(y_true=all_targets, y_pred=all_outputs, average='samples')
     f1score_macro = f1_score(y_true=all_targets, y_pred=all_outputs, average='macro')
     f1score_weighted = f1_score(y_true=all_targets, y_pred=all_outputs, average='weighted')
