@@ -1,6 +1,7 @@
 # Food_Ontology
 Image recognition
-- **mlclass.py:** contains the code
+- **mlclass.py:** contains the code multi-label
+- **slclass.py:** contains the code single-label
 
 inside the MAFood121 folder is:
 
